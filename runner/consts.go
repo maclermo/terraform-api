@@ -1,10 +1,9 @@
 package runner
 
 const (
-	TF_APPLY = iota
-	TF_PLAN
+	TF_PLAN = iota
+	TF_APPLY
 	TF_DESTROY
-	WS_DELETE
 )
 
 const (

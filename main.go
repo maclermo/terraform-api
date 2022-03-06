@@ -9,7 +9,9 @@ import (
 	"path/filepath"
 	"strings"
 	"terraform-api/runner"
+	"time"
 
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/gin-gonic/gin/binding"
 	"github.com/google/uuid"
@@ -127,7 +129,6 @@ func parseFormData(c *gin.Context) (runner.Request, error) {
 	}
 
 	request := runner.Request{
-		Workspace:     jsonRequest.Workspace,
 		Vars:          vars,
 		EnvVars:       envVars,
 		BackendConfig: backendConfig,
@@ -155,10 +156,19 @@ func main() {
 
 	router := gin.Default()
 
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"*"},
+		AllowMethods:     []string{"PUT", "PATCH"},
+		AllowHeaders:     []string{"Origin"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	router.POST("/plan", func(c *gin.Context) {
 		tfPath, requestBind, err := dispatchActions(c)
 		if err != nil {
-			c.JSON(500, map[string]string{"error": fmt.Sprint(err)})
+			c.JSON(500, map[string]string{"server error": fmt.Sprint(err)})
 			return
 		}
 		response := plan(tfPath, requestBind)
@@ -168,50 +178,28 @@ func main() {
 	router.POST("/apply", func(c *gin.Context) {
 		tfPath, requestBind, err := dispatchActions(c)
 		if err != nil {
-			c.JSON(500, map[string]string{"error": fmt.Sprint(err)})
+			c.JSON(500, map[string]string{"server error": fmt.Sprint(err)})
 			return
 		}
 		response := apply(tfPath, requestBind)
 		c.JSON(200, response)
 	})
 
-	router.POST("/destroy", func(c *gin.Context) {
+	router.DELETE("/destroy", func(c *gin.Context) {
 		tfPath, requestBind, err := dispatchActions(c)
 		if err != nil {
-			c.JSON(500, map[string]string{"error": fmt.Sprint(err)})
+			c.JSON(500, map[string]string{"server error": fmt.Sprint(err)})
 			return
 		}
 		response := destroy(tfPath, requestBind)
 		c.JSON(200, response)
 	})
 
-	router.GET("/output/:id", func(c *gin.Context) {
-		output, err := output(c.Param("id"))
+	router.GET("/jobs", func(c *gin.Context) {
+		result, err := jobs()
 		if err != nil {
-			c.JSON(500, map[string]string{"error": fmt.Sprint(err)})
+			c.JSON(404, map[string]string{"not found": fmt.Sprint(err)})
 			return
-		}
-		c.JSON(200, output)
-	})
-
-	router.GET("/status/:id", func(c *gin.Context) {
-		status, err := status(c.Param("id"))
-		if err != nil {
-			c.JSON(500, map[string]string{"error": fmt.Sprint(err)})
-			return
-		}
-		c.JSON(200, status)
-	})
-
-	router.GET("/delete/:id", func(c *gin.Context) {
-		deleted := delete(c.Param("id"))
-		c.JSON(200, deleted)
-	})
-
-	router.GET("/result/:id", func(c *gin.Context) {
-		result, err := result(c.Param("id"))
-		if err != nil {
-			c.JSON(500, map[string]string{"error": fmt.Sprint(err)})
 		}
 		c.JSON(200, result)
 	})

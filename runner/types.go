@@ -6,14 +6,12 @@ import (
 )
 
 type JSONRequest struct {
-	Workspace     string `form:"workspace" binding:"required"`
 	Vars          string `form:"vars"`
 	EnvVars       string `form:"envvars"`
 	BackendConfig string `form:"backendconfig"`
 }
 
 type Request struct {
-	Workspace     string
 	Vars          map[string]interface{}
 	EnvVars       map[string]string
 	BackendConfig map[string]interface{}
@@ -22,11 +20,12 @@ type Request struct {
 type JobResponse struct {
 	Result string
 	Errors error
+	Output string
 }
 
 type Job struct {
 	ID        uuid.UUID
-	Workspace string
+	Workspace uuid.UUID
 	Action    int
 	Request   terraform.Options
 	Response  JobResponse

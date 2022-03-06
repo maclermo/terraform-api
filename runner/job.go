@@ -27,9 +27,9 @@ func CreateJob(action int, path string, r *Request) *Job {
 	}
 	job := Job{
 		ID:        uuid.New(),
+		Workspace: uuid.New(),
 		Action:    action,
 		Request:   options,
-		Workspace: r.Workspace,
 		Status:    JOB_CREATED,
 	}
 
@@ -38,24 +38,8 @@ func CreateJob(action int, path string, r *Request) *Job {
 	return &job
 }
 
-func GetJobStatus(job uuid.UUID) int {
-	return Jobs[job].Status
-}
-
-func GetJobResult(job uuid.UUID) JobResponse {
-	return Jobs[job].Response
-}
-
-func GetJobOutput(job uuid.UUID) map[string]interface{} {
-	t := new(testing.T)
-
-	outputs, err := terraform.OutputAllE(t, &Jobs[job].Request)
-	if err != nil {
-		return map[string]interface{}{
-			"error": fmt.Sprintf("%v", err),
-		}
-	}
-	return outputs
+func GetJobsList() map[uuid.UUID]*Job {
+	return Jobs
 }
 
 func ExecuteJob(job *Job) {
@@ -71,7 +55,7 @@ func ExecuteJob(job *Job) {
 	case TF_PLAN:
 		log.Println("request \"plan\" recieved for", job.ID.String())
 
-		if job.Response.Result, job.Response.Errors = terraform.WorkspaceSelectOrNewE(t, opts, job.Workspace); job.Response.Errors != nil {
+		if job.Response.Result, job.Response.Errors = terraform.WorkspaceSelectOrNewE(t, opts, job.Workspace.String()); job.Response.Errors != nil {
 			job.Status = JOB_ERROR
 			return
 		}
@@ -82,7 +66,7 @@ func ExecuteJob(job *Job) {
 	case TF_APPLY:
 		log.Println("request \"apply\" recieved for", job.ID.String())
 
-		if job.Response.Result, job.Response.Errors = terraform.WorkspaceSelectOrNewE(t, opts, job.Workspace); job.Response.Errors != nil {
+		if job.Response.Result, job.Response.Errors = terraform.WorkspaceSelectOrNewE(t, opts, job.Workspace.String()); job.Response.Errors != nil {
 			job.Status = JOB_ERROR
 			return
 		}
@@ -90,10 +74,14 @@ func ExecuteJob(job *Job) {
 			job.Status = JOB_ERROR
 			return
 		}
+		if job.Response.Output, job.Response.Errors = terraform.OutputJsonE(t, opts, ""); job.Response.Errors != nil {
+			job.Status = JOB_ERROR
+			return
+		}
 	case TF_DESTROY:
 		log.Println("request \"destroy\" recieved for", job.ID.String())
 
-		if job.Response.Result, job.Response.Errors = terraform.WorkspaceSelectOrNewE(t, opts, job.Workspace); job.Response.Errors != nil {
+		if job.Response.Result, job.Response.Errors = terraform.WorkspaceSelectOrNewE(t, opts, job.Workspace.String()); job.Response.Errors != nil {
 			job.Status = JOB_ERROR
 			return
 		}
@@ -102,13 +90,6 @@ func ExecuteJob(job *Job) {
 			return
 		}
 		if job.Response.Result, job.Response.Errors = terraform.DestroyE(t, opts); job.Response.Errors != nil {
-			job.Status = JOB_ERROR
-			return
-		}
-	case WS_DELETE:
-		log.Println("request \"delete workspace\" recieved for", job.ID.String())
-
-		if job.Response.Result, job.Response.Errors = terraform.WorkspaceDeleteE(t, opts, job.Workspace); job.Response.Errors != nil {
 			job.Status = JOB_ERROR
 			return
 		}
