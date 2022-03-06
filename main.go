@@ -18,19 +18,19 @@ import (
 func unzipSource(source, destination string) error {
 	reader, err := zip.OpenReader(source)
 	if err != nil {
-		return err
+		return fmt.Errorf("error while opening zipped file from formData %s", err)
 	}
 	defer reader.Close()
 
 	destination, err = filepath.Abs(destination)
 	if err != nil {
-		return err
+		return fmt.Errorf("error while creating destination directory or directories %s", err)
 	}
 
 	for _, f := range reader.File {
 		err := unzipFile(f, destination)
 		if err != nil {
-			return err
+			return fmt.Errorf("error while unzipping file or files %s", err)
 		}
 	}
 
@@ -40,35 +40,35 @@ func unzipSource(source, destination string) error {
 func unzipFile(f *zip.File, destination string) error {
 	filePath := filepath.Join(destination, f.Name)
 	if !strings.HasPrefix(filePath, filepath.Clean(destination)+string(os.PathSeparator)) {
-		return fmt.Errorf("invalid file path: %s", filePath)
+		return fmt.Errorf("invalid file path %s", filePath)
 	}
 
 	if f.FileInfo().IsDir() {
 		if err := os.MkdirAll(filePath, os.ModePerm); err != nil {
-			return err
+			return fmt.Errorf("destination is not a valid directory for writing %s", err)
 		}
 		return nil
 	}
 
 	if err := os.MkdirAll(filepath.Dir(filePath), os.ModePerm); err != nil {
-		return err
+		return fmt.Errorf("cannot create directories for unzipped files %s", err)
 	}
 
 	destinationFile, err := os.OpenFile(filePath, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, f.Mode())
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot open destination file for writing %s", err)
 	}
 	defer destinationFile.Close()
 
 	zippedFile, err := f.Open()
 	if err != nil {
-		return err
+		return fmt.Errorf("cannot open zipped file %s", err)
 	}
 
 	defer zippedFile.Close()
 
 	if _, err := io.Copy(destinationFile, zippedFile); err != nil {
-		return err
+		return fmt.Errorf("could not copy unzipped file to destination %s", err)
 	}
 
 	return nil
@@ -84,7 +84,7 @@ func saveFileHandler(c *gin.Context) (string, error) {
 	fileUuid := uuid.New()
 	fileName := fileUuid.String() + extension
 	zipPath := "/tmp/zip"
-	zipFile := "/" + zipPath + fileName
+	zipFile := zipPath + "/" + fileName
 	tfPath := "/tmp/tf/" + fileUuid.String()
 
 	_ = os.Mkdir(zipPath, os.ModePerm)
